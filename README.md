@@ -1,56 +1,45 @@
-# 📑 SFSE Plugin Template
-Native dll plugin for [starfield script extender](https://github.com/ianpatt/sfse).
+# CommonLibSF Plugin Template
 
-[Create a new plugin project from this template](https://github.com/new?template_name=SF_PluginTemplate&template_owner=gottyduke) and wait for the first workflow action to finish, it will setup project automatically.
+This is a basic plugin template using CommonLibSF.
 
-## ⚙ Requirements
+### Requirements
+* [XMake](https://xmake.io) [2.8.2+]
+* C++23 Compiler (MSVC, Clang-CL)
 
-- [CMake 3.26+](https://cmake.org/)
-  - Add this to your `PATH`
-- [PowerShell](https://github.com/PowerShell/PowerShell/releases/latest)
-- [Vcpkg](https://github.com/microsoft/vcpkg)
-  - Add the environment variable `VCPKG_ROOT` with the value as the path to the folder containing vcpkg
-  - Make sure your local vcpkg port is up-to-date by pulling the latest and do `vcpkg integrate install`
-- [Visual Studio Community 2022](https://visualstudio.microsoft.com/)
-  - Desktop development with C++
-- [Starfield Steam Distribution](#-deployment)
-  - Add the environment variable `SFPath` with the value as the path to the game installation
-  
-## Get started
-
-### 💻 Register Visual Studio as a Generator
-
-- Open `x64 Native Tools Command Prompt`
-- Run `cmake`
-- Close the cmd window
-
-### 🔨 Building
-
-- [CommonLibSF](https://github.com/Starfield-Reverse-Engineering/CommonLibSF)
-- [DKUtil](https://github.com/gottyduke/DKUtil)
-
-These two dependencies can be setup either via git submodule (by executing `update-submodule.bat`) or through a local git repo (by specifying environment variable `CommonLibSFPath` and `DKUtilPath` pointing to local git repo path).
-
-> If having multiple projects, to avoid having copies of CommonLibSF and DKUtil in each of them, it's suggested to use the local fork and environment path approach, so all projects share the same package.
-
-```
-.\make-sln-msvc.bat
-cmake --build build
+## Getting Started
+```properties
+git clone --recurse-submodules https://github.com/DeadMor0z/StarfieldRadio-Nexus-Reupload.git
+cd StarfieldRadio-Nexus-Reupload
 ```
 
-### 📦 Deployment
+### Build
+To build the project, run the following command:
+```bat
+xmake build
+```
 
-This plugin template has auto deployment rules for easier build-and-test, build-and-package features, using simple json rules. [Read more here!](https://github.com/gottyduke/SF_PluginTemplate/wiki/Custom-deployment-rules)
+> ***Note:*** *This will generate a `build/windows/` directory in the **project's root directory** with the build output.*
 
-### ➕ DKUtil addon
+If build was successfull, compiled plugin will be in dist/Data/SFSE/Plugins directory.
 
-This project bundles [DKUtil](https://github.com/gottyduke/DKUtil).
+### Build Output (Optional)
+If you want to redirect the build output, set one of the following environment variables:
 
-## 📖 License
+- Path to a Starfield install folder: `XSE_SF_GAME_PATH`
 
-[GPL-3.0-or-later](COPYING) WITH [Modding Exception AND GPL-3.0 Linking Exception (with Corresponding Source)](EXCEPTIONS). Specifically, the Modded Code is Starfield (and its variants) and Modding Libraries include [Starfield Script Extender](https://github.com/ianpatt/sfse) and [DKUtil](https://github.com/gottyduke/DKUtil/) (and variants).
+- Path to a Mod Manager mods folder: `XSE_SF_MODS_PATH`
 
-## ❓ Credits
+### Project Generation (Optional)
+If you want to generate a Visual Studio project, run the following command:
+```bat
+xmake project -k vsxmake
+```
 
-- [ianpatt's starfield script extender](https://github.com/ianpatt/sfse).
-- [CommonLibSF, a collaborative effort project](https://github.com/Starfield-Reverse-Engineering/CommonLibSF)
+> ***Note:*** *This will generate a `vsxmakeXXXX/` directory in the **project's root directory** using the latest version of Visual Studio installed on the system.*
+
+### Upgrading Packages (Optional)
+If you want to upgrade the project's dependencies, run the following commands:
+```bat
+xmake repo --update
+xmake require --upgrade
+```
