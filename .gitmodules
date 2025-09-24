@@ -1,9 +1,3 @@
 [submodule "lib/commonlibsf"]
-  path = lib/commonlibsf
-  url = https://github.com/libxse/commonlibsf.git
-[submodule "lib/DKUtil"]
-  path = lib/DKUtil
-  url = https://github.com/gottyduke/DKUtil.git
-[submodule "lib/toml11"]
-  path = lib/toml11
-  url = https://github.com/ToruNiina/toml11.git
+	path = lib/commonlibsf
+	url = https://github.com/libxse/commonlibsf.git

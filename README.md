@@ -1,6 +1,6 @@
-# CommonLibSF Plugin Template
+# StarfieldGalacticRadio
 
-This is a basic plugin template using CommonLibSF.
+SFSE Plugin - Starfield Galactic Radio adds a radio and podcast player to Starfield, with a customizable playlist and controls.
 
 ### Requirements
 * [XMake](https://xmake.io) [2.8.2+]
