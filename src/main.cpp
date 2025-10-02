@@ -36,6 +36,15 @@ std::wstring to_wstring(const std::string &str)
     return wstrTo;
 }
 
+std::string utf8_encode(const std::wstring& wstr)
+{
+  if (wstr.empty()) return std::string();
+  int size_needed = WideCharToMultiByte(CP_UTF8, 0, &wstr[0], (int)wstr.size(), NULL, 0, NULL, NULL);
+  std::string strTo(size_needed, 0);
+  WideCharToMultiByte(CP_UTF8, 0, &wstr[0], (int)wstr.size(), &strTo[0], size_needed, NULL, NULL);
+  return strTo;
+}
+
 // Function to trim trailing commas and spaces
 std::string trimTrailingCommas(const std::string& str) {
     std::string result = str;
@@ -70,6 +79,70 @@ int hexStringToInt(const std::string& hexStr) {
     return value;
 }
 
+std::wstring GetRuntimePath()
+{
+  static wchar_t appPath[4096] = { 0 };
+
+  if(appPath[0])
+    return appPath;
+
+  GetModuleFileName(GetModuleHandle(NULL), appPath, sizeof(appPath)/sizeof(wchar_t));
+
+  return appPath;
+}
+
+std::wstring GetRuntimeName()
+{
+  std::wstring appPath = GetRuntimePath();
+
+  std::wstring::size_type slashOffset = appPath.rfind(L'\\');
+  if(slashOffset == std::wstring::npos)
+    return appPath;
+
+  return appPath.substr(slashOffset + 1);
+}
+
+const std::wstring & GetRuntimeDirectory()
+{
+  static std::wstring s_runtimeDirectory;
+
+  if(s_runtimeDirectory.empty())
+  {
+    std::wstring runtimePath = GetRuntimePath();
+
+    // truncate at last slash
+    std::wstring::size_type lastSlash = runtimePath.rfind(L'\\');
+    if(lastSlash != std::wstring::npos) // if we don't find a slash something is VERY WRONG
+    {
+      s_runtimeDirectory = runtimePath.substr(0, lastSlash + 1);
+    }
+    else
+    {
+      REX::WARN("no slash in runtime path? ({})", utf8_encode(runtimePath).c_str());
+    }
+  }
+
+  return s_runtimeDirectory;
+}
+
+const std::wstring & GetConfigPath(std::wstring configPath)
+{
+  static std::wstring s_configPath;
+
+  if(s_configPath.empty())
+  {
+    std::wstring runtimePath = GetRuntimeDirectory();
+    if(!runtimePath.empty())
+    {
+      s_configPath = runtimePath + configPath;
+
+      REX::INFO("config path = {}", utf8_encode(s_configPath).c_str());
+    }
+  }
+
+  return s_configPath;
+}
+
 void ConsoleExecute(std::string command)
 {
   static REL::Relocation<void**>                       BGSScaleFormManager{ REL::ID(938528) };
@@ -96,85 +169,60 @@ struct Config {
     int previousStationKey = 0x67;
     int seekForwardKey = 0x6A;
     int seekBackwardKey = 0x6F;
+    bool showOnAir = true;
+
+};
+
+struct ShowConfig {
+  bool ShowOnAir = true;
+  bool ShowInit = true;
+  bool ShowOnOff = true;
+  bool ShowPlayAt = true;
+  bool ShowVolume = true;
+  bool ShowConnecting = true;
+  bool ShowMediaFound = true;
 };
 
 // Function to load the configuration from the TOML file
-void loadConfig(Config& config) {
-    std::ifstream configFile(".\\Data\\SFSE\\Plugins\\StarfieldGalacticRadio.toml");
-    if (!configFile.is_open()) {
-        REX::INFO("Could not open configuration file!");
-        return;
+void loadConfig(Config& config, ShowConfig& showConfig) {
+
+    auto data = toml::parse(utf8_encode(GetConfigPath(L"Data\\SFSE\\Plugins\\StarfieldGalacticRadio.toml")), toml::spec::v(1,1,0));
+    config.autoStartRadio = toml::find_or<bool>(data, "AutoStartRadio", false);
+    config.randomizeStartTime = toml::find_or<bool>(data, "RandomizeStartTime", false);
+    if (data.contains("Playlist") && data.at("Playlist").is_array())
+    {
+      config.playlist.clear();
+      config.playlist = toml::find<std::vector<std::string>>(data, "Playlist");
     }
+    config.toggleRadioKey = toml::find_or<int>(data, "ToggleRadioKey", 0x60);
+    config.switchModeKey = toml::find_or<int>(data, "SwitchModeKey", 0x6D);
+    config.volumeUpKey = toml::find_or<int>(data, "VolumeUpKey", 0x69);
+    config.volumeDownKey = toml::find_or<int>(data, "VolumeDownKey", 0x66);
+    config.nextStationKey = toml::find_or<int>(data, "NextStationKey", 0x68);
+    config.previousStationKey = toml::find_or<int>(data, "PreviousStationKey", 0x67);
+    config.seekForwardKey = toml::find_or<int>(data, "SeekForwardKey", 0x6A);
+    config.seekBackwardKey = toml::find_or<int>(data, "ToggleRadioKey", 0x6F);
+  
+    showConfig.ShowOnAir = toml::find_or<bool>(data, "ShowOnAir", true);
+    showConfig.ShowOnOff = toml::find_or<bool>(data, "ShowOnOff", true);
+    showConfig.ShowPlayAt = toml::find_or<bool>(data, "ShowPlayAt", true);
+    showConfig.ShowConnecting = toml::find_or<bool>(data, "ShowConnecting", true);
+    showConfig.ShowMediaFound = toml::find_or<bool>(data, "ShowMediaFound", true);
+    showConfig.ShowVolume = toml::find_or<bool>(data, "ShowVolume", true);
+    showConfig.ShowInit = toml::find_or<bool>(data, "ShowInit", true);
 
-    std::string line;
-    while (std::getline(configFile, line)) {
-        std::istringstream lineStream(line);
-        std::string key;
-    line = trim(line);
-
-        if (line.find("AutoStartRadio") != std::string::npos) {
-            bool value;
-            lineStream >> key >> value;
-            config.autoStartRadio = value;
-            REX::INFO("AutoStartRadio: {}", config.autoStartRadio);
-        } else if (line.find("RandomizeStartTime") != std::string::npos) {
-            bool value;
-            lineStream >> key >> value;
-            config.randomizeStartTime = value;
-            REX::INFO("RandomizeStartTime: {}", config.randomizeStartTime);
-        } else if (line.find("Playlist =") != std::string::npos) {
-      config.playlist.clear();  // Clear any existing entries
-
-      // Now read each playlist item until we find a line containing ']'
-      while (std::getline(configFile, line)) {
-        line = trim(line);  // Trim whitespace from line
-
-        size_t closingBracketPos = line.find("]");
-        if (closingBracketPos != std::string::npos) {
-          // If ']' is found, take everything before it and break the loop
-          line = line.substr(0, closingBracketPos);
-        }
-
-        if (!line.empty()) {
-          line.erase(std::remove(line.begin(), line.end(), '"'), line.end()); // Remove quotes
-          config.playlist.push_back(line);
-          // REX::INFO("Playlist item: {}", line);
-        }
-
-        // Break if we found ']' on this line
-        if (closingBracketPos != std::string::npos) {
-          break;
-        }
-      }
-    } else if (line.find("ToggleRadioKey=") != std::string::npos) {
-      config.toggleRadioKey = hexStringToInt(line.substr(line.find('=') + 1));
-    } else if (line.find("SwitchModeKey=") != std::string::npos) {
-      config.switchModeKey = hexStringToInt(line.substr(line.find('=') + 1));
-    } else if (line.find("VolumeUpKey=") != std::string::npos) {
-      config.volumeUpKey = hexStringToInt(line.substr(line.find('=') + 1));
-    } else if (line.find("VolumeDownKey=") != std::string::npos) {
-      config.volumeDownKey = hexStringToInt(line.substr(line.find('=') + 1));
-    } else if (line.find("NextStationKey=") != std::string::npos) {
-      config.nextStationKey = hexStringToInt(line.substr(line.find('=') + 1));
-    } else if (line.find("PreviousStationKey=") != std::string::npos) {
-      config.previousStationKey = hexStringToInt(line.substr(line.find('=') + 1));
-    } else if (line.find("SeekForwardKey=") != std::string::npos) {
-      config.seekForwardKey = hexStringToInt(line.substr(line.find('=') + 1));
-    } else if (line.find("SeekBackwardKey=") != std::string::npos) {
-      config.seekBackwardKey = hexStringToInt(line.substr(line.find('=') + 1));
-    }
-    }
 }
 
 // Function to print the loaded configuration
-void printConfig(const Config& config) {
+void printConfig(const Config& config, const ShowConfig& show) {
   
-    REX::INFO("{} - AutoStartRadio: {}", PROJECT_NAME, config.autoStartRadio);
-    REX::INFO("{} - RandomizeStartTime: {}", PROJECT_NAME, config.randomizeStartTime);
-    REX::INFO("{} - Playlist:", PROJECT_NAME);
-    for (const auto& song : config.playlist) {
-        REX::INFO("{} playlist item - {}", PROJECT_NAME, song);
-    }
+  REX::INFO("{} - AutoStartRadio: {}", PROJECT_NAME, config.autoStartRadio);
+  REX::INFO("{} - RandomizeStartTime: {}", PROJECT_NAME, config.randomizeStartTime);
+  REX::INFO("{} - Playlist:", PROJECT_NAME);
+  for (const auto& song : config.playlist)
+  {
+    REX::INFO("{} playlist item - {}", PROJECT_NAME, song);
+  }
   REX::INFO("{} - ToggleRadioKey: 0x{:X}", PROJECT_NAME, config.toggleRadioKey);
   REX::INFO("{} - SwitchModeKey: 0x{:X}", PROJECT_NAME, config.switchModeKey);
   REX::INFO("{} - VolumeUpKey: 0x{:X}", PROJECT_NAME, config.volumeUpKey);
@@ -183,16 +231,25 @@ void printConfig(const Config& config) {
   REX::INFO("{} - PreviousStationKey: 0x{:X}", PROJECT_NAME, config.previousStationKey);
   REX::INFO("{} - SeekForwardKey: 0x{:X}", PROJECT_NAME, config.seekForwardKey);
   REX::INFO("{} - SeekBackwardKey: 0x{:X}", PROJECT_NAME, config.seekBackwardKey);
+
+  REX::INFO("{} - ShowInit: {}", PROJECT_NAME, show.ShowInit);
+  REX::INFO("{} - ShowConnecting: {}", PROJECT_NAME, show.ShowConnecting);
+  REX::INFO("{} - ShowOnAir: {}", PROJECT_NAME, show.ShowOnAir);
+  REX::INFO("{} - ShowPlayAt: {}", PROJECT_NAME, show.ShowPlayAt);
+  REX::INFO("{} - ShowMediaFound: {}", PROJECT_NAME, show.ShowMediaFound);
+  REX::INFO("{} - ShowVolume: {}", PROJECT_NAME, show.ShowVolume);
+  REX::INFO("{} - ShowOnOff: {}", PROJECT_NAME, show.ShowOnOff);
 }
 
 
 class RadioPlayer
 {
 public:
-  RadioPlayer(const std::vector<std::string>& InStations, bool InAutoStart, bool InRandomizeStartTime) :
+  RadioPlayer(const std::vector<std::string>& InStations, bool InAutoStart, bool InRandomizeStartTime, const ShowConfig& InShow) :
     AutoStart(InAutoStart),
     RandomizeStartTime(InRandomizeStartTime),
-    Stations(InStations)
+    Stations(InStations),
+    Show(InShow)
   {
   }
 
@@ -244,7 +301,7 @@ public:
       REX::INFO("{} v{} - Station path is empty, unable to start playback -", PROJECT_NAME, PROJECT_VERSION);
     }
 
-    if (!StationInfo.first.empty())
+    if (!StationInfo.first.empty() && Show.ShowOnAir)
       Notification(std::format("On Air - {}", StationInfo.first));
 
     REX::INFO("{} v{} - Selected Station {}, AutoStart: {}, Mode: {} -", PROJECT_NAME, PROJECT_VERSION, Stations[StationIndex], AutoStart, Mode);
@@ -263,12 +320,14 @@ public:
         REX::INFO("{} - Invalid track length: {}, playback cannot start", PROJECT_NAME, trackLength);
       }
       //Notification(std::format("当前播放进度：{}%%", std::floor((static_cast<float>(randStart % getTrackLength()) * 100 / getTrackLength()) * 10) / 10.0f));
-      Notification(std::format("Play at: {}%%", std::floor((static_cast<float>(randStart % getTrackLength())*100 / getTrackLength()) * 10) / 10.0f));
+      if (Show.ShowPlayAt)
+        Notification(std::format("Play at: {}%%", std::floor((static_cast<float>(randStart % getTrackLength())*100 / getTrackLength()) * 10) / 10.0f));
       mciSendString(L"setaudio sfradio volume to 0", NULL, 0, NULL);
     }
 
     //Notification("银河电台初始化完成");
-    Notification("Starfield Radio Initialized");
+    if (Show.ShowInit)
+      Notification("Starfield Radio Initialized");
   }
 
   int32_t getElapsedTimeInSec()
@@ -311,11 +370,13 @@ public:
         return;
       }
       //Notification("正在连接至银河电台网络。由于跨星际传输，通讯可能存在延迟，请稍等。");
-      Notification("Connecting to Galactic Radio Network. Delay expected because of the inter-stellar communication.");
+      if (Show.ShowConnecting)
+        Notification("Connecting to Galactic Radio Network. Delay expected because of the inter-stellar communication.");
     } else {
       std::wstring OpenLocalFile = to_wstring(std::format("open \".\\Data\\SFSE\\Plugins\\StarfieldGalacticRadio\\tracks\\{}\" type mpegvideo alias sfradio", StationURL));
       //Notification("在当前设备上检测到本地媒体文件，现在进行播放。");
-      Notification("Local media on your device found, playing right now.");
+      if (Show.ShowMediaFound)
+        Notification("Local media on your device found, playing right now.");
       REX::INFO("{} - Attempt to load file - {}", PROJECT_NAME, StationURL);
       int result = mciSendString(OpenLocalFile.c_str(), NULL, 0, NULL);
       if (result != 0) {
@@ -326,12 +387,13 @@ public:
 
     int32_t NewPosition = (getElapsedTimeInSec() % getTrackLength() + randStart) * 1000 % getTrackLength();
 
-    if (!StationInfo.first.empty())
+    if (!StationInfo.first.empty() && Show.ShowOnAir)
       Notification(std::format("On Air - {}", StationInfo.first));
 
     // mciSendString(L"play sfradio repeat", NULL, 0, NULL);
     //Notification(std::format("当前播放进度：{}%%", std::floor((static_cast<float>(NewPosition % getTrackLength()) * 100 / getTrackLength()) * 10) / 10.0f));
-    Notification(std::format("Play at: {}%%", std::floor((static_cast<float>(NewPosition % getTrackLength()) * 100 / getTrackLength()) * 10) / 10.0f));
+    if (Show.ShowPlayAt)
+      Notification(std::format("Play at: {}%%", std::floor((static_cast<float>(NewPosition % getTrackLength()) * 100 / getTrackLength()) * 10) / 10.0f));
     mciSendString(to_wstring(std::format("play sfradio from {} repeat", NewPosition)).c_str(), NULL, 0, NULL);
 
     std::wstring v = to_wstring(std::format("setaudio sfradio volume to {}", (int)Volume));
@@ -366,7 +428,8 @@ public:
     std::wstring v = to_wstring(std::format("setaudio sfradio volume to {}", (int)Volume));
     mciSendString(v.c_str(), NULL, 0, NULL);
 
-    Notification(std::format("Volume {}", Volume));
+    if (Show.ShowVolume)
+      Notification(std::format("Volume {}", Volume));
   }
 
   void IncreaseVolume()
@@ -375,7 +438,8 @@ public:
     std::wstring v = to_wstring(std::format("setaudio sfradio volume to {}", (int)Volume));
     mciSendString(v.c_str(), NULL, 0, NULL);
 
-    Notification(std::format("Volume {}", Volume));
+    if (Show.ShowVolume)
+      Notification(std::format("Volume {}", Volume));
   }
 
   uint32_t GetTrackLength()
@@ -445,11 +509,11 @@ public:
     std::pair<std::string, std::string> StationInfo = GetStationInfo(Stations[StationIndex]);
 
     if (IsPlaying) {
-      if (!StationInfo.first.empty())
+      if (!StationInfo.first.empty() && Show.ShowOnAir)
         Notification(std::format("On Air - {}", StationInfo.first));
-      else
+      else if (Show.ShowOnOff)
         Notification("Radio On");
-    } else
+    } else if (Show.ShowOnOff)
       Notification("Radio Off");
 
     if (Mode == 0) {
@@ -502,10 +566,12 @@ private:
   bool  AutoStart = true;
   bool  IsStarted = false;
   bool  IsPlaying = false;
-
+  
   std::vector<std::string> Stations;
   std::time_t              RadioStartTime;
   int32_t                  randStart;
+
+  ShowConfig Show;
 };
 
 const int    TimePerFrame = 50;
@@ -520,10 +586,11 @@ static DWORD MainLoop(void* unused)
   std::string configFilename = "StarfieldGalacticRadio.toml";
 
   Config config; // Create a Config instance
-  loadConfig(config); // Load configuration from file
+  ShowConfig showConfig;
+  loadConfig(config, showConfig); // Load configuration from file
   
   trimPlaylist(config.playlist);
-  // printConfig(config);
+  //printConfig(config, showConfig);
 
 
   REX::DEBUG("Loaded config, waiting for player form...");
@@ -532,7 +599,7 @@ static DWORD MainLoop(void* unused)
 
   REX::DEBUG("Pre-Initialize RadioPlayer.");
 
-  RadioPlayer Radio(config.playlist, config.autoStartRadio, config.randomizeStartTime);
+  RadioPlayer Radio(config.playlist, config.autoStartRadio, config.randomizeStartTime, showConfig);
   Radio.Init();
 
   REX::DEBUG("Post-Initialize RadioPlayer.");

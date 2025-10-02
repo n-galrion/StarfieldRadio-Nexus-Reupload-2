@@ -6,6 +6,7 @@
 #include <string>
 #include <shlobj.h>
 #include <stdint.h>
+#include <toml.hpp>
 
 using namespace std::literals;
 
