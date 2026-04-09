@@ -186,7 +186,21 @@ struct ShowConfig {
 // Function to load the configuration from the TOML file
 void loadConfig(Config& config, ShowConfig& showConfig) {
 
-    auto data = toml::parse(utf8_encode(GetConfigPath(L"Data\\SFSE\\Plugins\\StarfieldGalacticRadio.toml")), toml::spec::v(1,1,0));
+    auto file_data = toml::parse(utf8_encode(GetConfigPath(L"Data\\SFSE\\Plugins\\StarfieldGalacticRadio.toml")), toml::spec::v(1,1,0));
+
+    // The TOML file has all keys under a [SectionName] table.
+    // Find the first table in the file and use it, or fall back to root.
+    const auto& data = [&]() -> const toml::value& {
+      if (file_data.is_table()) {
+        for (const auto& [key, val] : file_data.as_table()) {
+          if (val.is_table()) {
+            return val;
+          }
+        }
+      }
+      return file_data;
+    }();
+
     config.autoStartRadio = toml::find_or<bool>(data, "AutoStartRadio", false);
     config.randomizeStartTime = toml::find_or<bool>(data, "RandomizeStartTime", false);
     if (data.contains("Playlist") && data.at("Playlist").is_array())
@@ -202,7 +216,7 @@ void loadConfig(Config& config, ShowConfig& showConfig) {
     config.previousStationKey = toml::find_or<int>(data, "PreviousStationKey", 0x67);
     config.seekForwardKey = toml::find_or<int>(data, "SeekForwardKey", 0x6A);
     config.seekBackwardKey = toml::find_or<int>(data, "ToggleRadioKey", 0x6F);
-  
+
     showConfig.ShowOnAir = toml::find_or<bool>(data, "ShowOnAir", true);
     showConfig.ShowOnOff = toml::find_or<bool>(data, "ShowOnOff", true);
     showConfig.ShowPlayAt = toml::find_or<bool>(data, "ShowPlayAt", true);
@@ -505,6 +519,9 @@ public:
         Seek(RandomTime);
       }
     }
+
+    if (Stations.empty() || StationIndex >= static_cast<int>(Stations.size()))
+      return;
 
     std::pair<std::string, std::string> StationInfo = GetStationInfo(Stations[StationIndex]);
 
