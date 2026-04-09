@@ -8,7 +8,7 @@ SFSE Plugin - Starfield Galactic Radio adds a radio and podcast player to Starfi
 
 ## Getting Started
 ```properties
-git clone --recurse-submodules https://github.com/DeadMor0z/StarfieldRadio-Nexus-Reupload.git
+git clone --recurse-submodules https://github.com/n-galrion/StarfieldRadio-Nexus-Reupload-2.git
 cd StarfieldRadio-Nexus-Reupload
 ```
 
