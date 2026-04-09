@@ -40,7 +40,22 @@ target("StarfieldGalacticRadio")
         }
     })
 
-    add_defines("UNICODE")
+    add_defines("UNICODE", "_UNICODE")
+
+    -- imgui (vendored source)
+    add_includedirs("lib/imgui", "lib/imgui/backends")
+    add_files("lib/imgui/imgui.cpp", "lib/imgui/imgui_draw.cpp",
+              "lib/imgui/imgui_tables.cpp", "lib/imgui/imgui_widgets.cpp",
+              "lib/imgui/backends/imgui_impl_dx12.cpp",
+              "lib/imgui/backends/imgui_impl_win32.cpp")
+
+    -- minhook (vendored source - C files, no PCH)
+    add_includedirs("lib/minhook/include")
+    add_files("lib/minhook/src/buffer.c", "lib/minhook/src/hook.c",
+              "lib/minhook/src/trampoline.c",
+              "lib/minhook/src/hde/hde32.c", "lib/minhook/src/hde/hde64.c")
+
+    add_syslinks("d3d12", "dxgi")
 
     on_load(function(target)
       import("core.project.project")
